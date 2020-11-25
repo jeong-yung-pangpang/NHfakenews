@@ -1,4 +1,4 @@
-# ÆĞÅ°Áö ¼³Ä¡
+# íŒ¨í‚¤ì§€ ì„¤ì¹˜
 if (!require(dplyr))     install.packages("dplyr")
 if (!require(tidyverse)) install.packages("tidyverse")
 if (!require(stringr))   install.packages("stringr")
@@ -7,86 +7,89 @@ if (!require(KoNLP))     install.packages("KoNLP")
 if (!require(wordcloud)) install.packages("wordcloud")
 if (!require(extrafont)) install.packages("extrafont")
 
-# ÆĞÅ°Áö ·Îµå
+# íŒ¨í‚¤ì§€ ë¡œë“œ
 library(dplyr)
-library(readr)        # ÆÄÀÏ ÀĞ±â ±â´É Á¦°ø (tidyverseÆĞÅ°Áö¿¡ Æ÷ÇÔµÊ)
-library(stringr)      # ¹®ÀÚ¿­ °ü·Ã ±â´É Á¦°ø ÆĞÅ°Áö
-library(rJava)        # KoNLP°¡ ÀÇÁ¸ÇÔ (Java±â´É È£Ãâ ÆĞÅ°Áö)
-library(memoise)      # KoNLP°¡ ÀÇÁ¸ÇÔ
-library(KoNLP)        # ÇÑ±Ûµ¥ÀÌÅÍ ÇüÅÂ¼Ò ºĞ¼® ÆĞÅ°Áö (ÀÌ¸§ ´ë¼Ò¹®ÀÚ ÁÖÀÇ)
-library(wordcloud)    # ¿öµåÅ¬¶ó¿ìµå »ı¼º ÆĞÅ°Áö
-library(RColorBrewer) # »ö»ó Á¦¾î ÆĞÅ°Áö
-library(extrafont)    # ÆùÆ®°ü¸® ÆĞÅ°Áö
+library(readr)        # íŒŒì¼ ì½ê¸° ê¸°ëŠ¥ ì œê³µ (tidyverseíŒ¨í‚¤ì§€ì— í¬í•¨ë¨)
+library(stringr)      # ë¬¸ìì—´ ê´€ë ¨ ê¸°ëŠ¥ ì œê³µ íŒ¨í‚¤ì§€
+library(rJava)        # KoNLPê°€ ì˜ì¡´í•¨ (Javaê¸°ëŠ¥ í˜¸ì¶œ íŒ¨í‚¤ì§€)
+library(memoise)      # KoNLPê°€ ì˜ì¡´í•¨
+library(KoNLP)        # í•œê¸€ë°ì´í„° í˜•íƒœì†Œ ë¶„ì„ íŒ¨í‚¤ì§€ (ì´ë¦„ ëŒ€ì†Œë¬¸ì ì£¼ì˜)
+library(wordcloud)    # ì›Œë“œí´ë¼ìš°ë“œ ìƒì„± íŒ¨í‚¤ì§€
+library(RColorBrewer) # ìƒ‰ìƒ ì œì–´ íŒ¨í‚¤ì§€
+library(extrafont)    # í°íŠ¸ê´€ë¦¬ íŒ¨í‚¤ì§€
 
-# ÆùÆ® ½ºÄµ
+# í°íŠ¸ ìŠ¤ìº”
 font_import(pattern="NanumGothic.ttf")
 loadfonts(device="win")       # Windows
 fonts <- fonttable()
 unique(fonts$FamilyName)
 
-# µ¥ÀÌÅÍ ·Îµå
+# ë°ì´í„° ë¡œë“œ
 news_train <- read_csv("C:/Users/user/Desktop/open/news_train.csv")
 str(news_train)
 
-# ´º½º °³¼ö
+# ë‰´ìŠ¤ ê°œìˆ˜
 df_uniq <- unique(news_train$n_id)
 length(df_uniq)
 
-# °áÃøÄ¡ È®ÀÎ
+# ê²°ì¸¡ì¹˜ í™•ì¸
 sum(is.na(news_train))
 
-# Áßº¹µÈ content Á¦°Å
+# ì¤‘ë³µëœ content ì œê±°
 news_train_2 = news_train[-which(duplicated(news_train$content)),]
+
+# info(label) ë¹„ìœ¨ í™•ì¸
+table(news_train_2$info)
 
 text = news_train_2$content
 
-# »çÀü »ç¿ë
+# ì‚¬ì „ ì‚¬ìš©
 useNIADic()
 
-# \\WÀº Æ¯¼ö¹®ÀÚ¸¦ ÀÇ¹ÌÇÏ´Â Á¤±Ô½Ä
+# \\Wì€ íŠ¹ìˆ˜ë¬¸ìë¥¼ ì˜ë¯¸í•˜ëŠ” ì •ê·œì‹
 text <- str_replace_all(text,"\\W"," ")
 head(text)
 
-# ¸í»ç ÃßÃâ ¿¬½À
+# ëª…ì‚¬ ì¶”ì¶œ ì—°ìŠµ
 nouns <- extractNoun(text)
 head(nouns)
 
-# °á°ú°¡ list·Î ÃßÃâµÇ´Âµ¥ ÀÌ¸¦ vectorÇüÅÂ·Î º¯È¯
+# ê²°ê³¼ê°€ listë¡œ ì¶”ì¶œë˜ëŠ”ë° ì´ë¥¼ vectorí˜•íƒœë¡œ ë³€í™˜
 words <- unlist(nouns)
 head(words)
 
-# 2±ÛÀÚ ÀÌ»ó ¹®ÀÚ¸¸ ÇÊÅÍ
+# 2ê¸€ì ì´ìƒ ë¬¸ìë§Œ í•„í„°
 filtered <- Filter(function(x) {nchar(x) >= 2}, words)
 head(filtered)
 
-# Æ¯¼ö±âÈ£, ¿µ¾î, ¼ıÀÚ Á¦°Å
+# íŠ¹ìˆ˜ê¸°í˜¸, ì˜ì–´, ìˆ«ì ì œê±°
 filtered <- str_replace_all(filtered,"[^[:alpha:]]","")
 filtered <- str_replace_all(filtered,"[A-Za-z0-9]","")
 head(filtered)
 
-# ºóµµ¸¦ Á¶»çÇØº¸ÀÚ
+# ë¹ˆë„ë¥¼ ì¡°ì‚¬í•´ë³´ì
 wordcount <- table(filtered)
 head(wordcount)
 
-# ºóµµ¸¦ °¡Áö°í ÀÖ´Â µ¥ÀÌÅÍ¸¦ data frameÀ¸·Î º¯È¯
+# ë¹ˆë„ë¥¼ ê°€ì§€ê³  ìˆëŠ” ë°ì´í„°ë¥¼ data frameìœ¼ë¡œ ë³€í™˜
 df <- as.data.frame(wordcount, stringsAsFactors = F)
 head(df)
 
-# µÎ ±ÛÀÚ ÀÌ»ó ´Ü¾î ÃßÃâ
+# ë‘ ê¸€ì ì´ìƒ ë‹¨ì–´ ì¶”ì¶œ
 result_df <- filter(df, nchar(filtered) >= 2)
 head(result_df)
 
-# ¿öµå Å¬¶ó¿ìµå ¸¸µé±â
+# ì›Œë“œ í´ë¼ìš°ë“œ ë§Œë“¤ê¸°
 pal <- brewer.pal(8,"Dark2")
-# ·£´ı°ª °íÁ¤ -> ½ÇÇà½Ã¸¶´Ù µ¿ÀÏÇÑ ¸ğ¾çÀ¸·Î »ı¼ºµÇµµ·Ï ÇÔ
+# ëœë¤ê°’ ê³ ì • -> ì‹¤í–‰ì‹œë§ˆë‹¤ ë™ì¼í•œ ëª¨ì–‘ìœ¼ë¡œ ìƒì„±ë˜ë„ë¡ í•¨
 set.seed(1234)
 
-# ¿öµåÅ¬¶ó¿ìµå »ı¼º
-wordcloud(words = result_df$filtered,    # ´Ü¾î
-          freq = result_df$Freq,     # ºóµµ
-          min.freq = 3,             # ÃÖ¼Ò ´Ü¾î ºóµµ
-          max.words = 100,          # Ç¥Çö ´Ü¾î ¼ö
-          random.order = FALSE,     # °íºóµµ ´Ü¾î Áß¾Ó ¹èÄ¡
-          random.color = FALSE,     # »ö»óÀ¸·Î ºóµµ Ç¥Çö ¿©ºÎ
-          colors = pal,             # »ö±ò ¸ñ·Ï
-          family="NanumGothic")     # »ç¿ëÇÒ ÆùÆ®
+# ì›Œë“œí´ë¼ìš°ë“œ ìƒì„±
+wordcloud(words = result_df$filtered,    # ë‹¨ì–´
+          freq = result_df$Freq,     # ë¹ˆë„
+          min.freq = 3,             # ìµœì†Œ ë‹¨ì–´ ë¹ˆë„
+          max.words = 100,          # í‘œí˜„ ë‹¨ì–´ ìˆ˜
+          random.order = FALSE,     # ê³ ë¹ˆë„ ë‹¨ì–´ ì¤‘ì•™ ë°°ì¹˜
+          random.color = FALSE,     # ìƒ‰ìƒìœ¼ë¡œ ë¹ˆë„ í‘œí˜„ ì—¬ë¶€
+          colors = pal,             # ìƒ‰ê¹” ëª©ë¡
+          family="NanumGothic")     # ì‚¬ìš©í•  í°íŠ¸
