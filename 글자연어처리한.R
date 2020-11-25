@@ -1,0 +1,275 @@
+# R 64bit 실행(rstudio 실행도 가능) 
+
+# java, rJava 설치 install.packages("multilinguer")
+# 이때 mac 사용자는 데스크탑 비밀번호를 물어봅니다. 입력해줘야 설치가 진행됩니다.
+install.packages("multilinguer")
+library(multilinguer)
+install_jdk()
+# 위 함수에서 에러가 발생하면 알려주세요
+# https://github.com/mrchypark/multilinguer/issues
+
+# 의존성 패키지 설치
+install.packages(c("hash", "tau", "Sejong", "RSQLite", "devtools", "bit", "rex", "lazyeval", "htmlwidgets", "crosstalk", "promises", "later", "sessioninfo", "xopen", "bit64", "blob", "DBI", "memoise", "plogr", "covr", "DT", "rcmdcheck", "rversions"), type = "binary")
+
+# github 버전 설치
+install.packages("remotes")
+# 64bit 에서만 동작합니다.
+remotes::install_github('haven-jeon/KoNLP', upgrade = "never", INSTALL_opts=c("--no-multiarch"), force = TRUE)
+
+library('KoNLP')
+
+install.packages('wordcloud')
+install.packages('tm')
+install.packages('e1071')
+install.packages('gmodels')
+install.packages('SnowballC')
+install.packages('randomForest')
+install.packages('dplyr')
+install.packages('tidyverse')
+install.packages('tidytext')
+install.packages('reshape2')
+install.packages('wordcloud2')
+library(wordcloud)
+library(tm)
+library(e1071)
+library(gmodels)
+library(SnowballC)
+library(randomForest)
+library(dplyr)
+library(tidytext)
+library(tidyverse)
+library(tidyr)
+library(reshape2)
+library(wordcloud2)
+df_uniq <- unique(news_train$n_id)
+length(df_uniq)
+
+# 결측치 확인
+sum(is.na(news_train))
+
+# 중복된 content 제거
+news_train_2 = news_train[-which(duplicated(news_train$content)),]
+text = news_train_2$content
+
+# \\W은 특수문자를 의미하는 정규식
+text <- str_replace_all(text,"\\W"," ")
+head(text)
+
+# 명사 추출 연습
+nouns <- extractNoun(text)
+head(nouns)
+
+# 결과가 list로 추출되는데 이를 vector형태로 변환
+words <- unlist(nouns)
+head(words)
+
+# 2글자 이상 문자만 필터
+filtered <- Filter(function(x) {nchar(x) >= 2}, words)
+head(filtered)
+
+mp <- SimplePos09(text)
+mp
+
+m_df <- mp%>%melt%>%as_tibble
+m_df_copy <- m_df[,c(3,1)]
+m_df_copy
+
+m_df_copy_1 <- m_df_copy %>% 
+  mutate(noun=str_match(value, '([가-힣]+)/N')[,2]) %>%
+  na.omit %>% 
+  filter(str_length(noun)>=2) %>% 
+  count(noun, sort=TRUE) 
+  
+
+df1 <- nouns %>% 
+  mutate(noun=str_match(value, '([가-힣]+)/N')[,3]) %>%
+  na.omit %>% 
+  filter(str_length(noun)>=2) %>% 
+  count(noun, sort=TRUE) %>%
+  filter(n>=200) %>%
+  wordcloud2(fontFamily='Noto Sans CJK KR Bold', size = 0.5)
+
+
+m %>% 
+  tibble(line=1:41, text=.) %>%
+  unnest_tokens(pos, text, token=SimplePos09)
+text <- str_replace_all(text,"\\W"," ")
+head(text)
+
+# 명사 추출 연습
+nouns <- extractNoun(text)
+head(nouns)
+
+# 결과가 list로 추출되는데 이를 vector형태로 변환
+words <- unlist(nouns)
+head(words)
+
+# 2글자 이상 문자만 필터
+filtered <- Filter(function(x) {nchar(x) >= 2}, nouns)
+head(filtered)
+
+# 특수기호, 영어, 숫자 제거
+filtered <- str_replace_all(filtered,"[^[:alpha:]]","")
+filtered <- str_replace_all(filtered,"[A-Za-z0-9]","")
+head(filtered)
+
+nouns1 <- as.matrix(filtered)
+
+# 빈도를 조사해보자
+wordcount <- table(filtered)
+head(wordcount)
+wordcount
+
+# 빈도를 가지고 있는 데이터를 data frame으로 변환
+df <- as.data.frame(wordcount, stringsAsFactors = F)
+head(df)
+
+# 두 글자 이상 단어 추출
+result_df <- filter(df, nchar(filtered) >= 2)
+head(result_df)
+
+result_df <- result_df[-1,]
+
+result_df %>% 
+  filter(Freq>=200) %>%
+  wordcloud2(fontFamily='Noto Sans CJK KR Bold', size = 0.5)
+
+corpus <- VCorpus(VectorSource(nouns))
+
+# 숫자 제거
+corpus <- tm_map(corpus, removeNumbers)
+# 특수 기호 제거
+corpus <- tm_map(corpus, removePunctuation)
+
+# 단어-문서 행렬(단어 빈도수)
+dtm = DocumentTermMatrix(corpus)
+dtm
+as.matrix(dtm[1:5, 1:20])
+
+# DTM 내에 있는 각 단어에 대한 중요도를 계산할 수 있는 TF-IDF 가중치
+# 숫자로 된 단어를 제외하고 2글자 이상 단어만 사용
+dtmTfIdf <- DocumentTermMatrix( x = corpus, control = list( removeNumbers = TRUE, wordLengths = c(2, 7), weighting = function(x) weightTfIdf(x, normalize = TRUE) ))  
+dtmTfIdf
+as.matrix(dtmTfIdf[1:5, 1:500])
+
+# 차원축소 : 희소성(sparsity)이 0.95가 넘는 열 삭제
+spdtm = removeSparseTerms(dtmTfIdf, 0.95)
+spdtm
+as.matrix(spdtm[1:5, 1:100])
+
+# 키워드 상관 단어 파악
+findAssocs(spdtm,'코로나',0.1)
+
+# 상관 행렬 만들기
+spdtm %>% as.matrix() %>% cor() -> corTerms
+glimpse(corTerms)
+
+# 단어 네트워크맵
+install.packages('network')
+install.packages('GGally')
+install.packages('sna')
+library(network)
+library(GGally)
+library(sna)
+corTerms[1:10, 1:10]
+dim(corTerms)
+netTerms <- network(x = corTerms, directed = FALSE)
+plot(netTerms, vertex.cex = 1)
+corTerms[corTerms <= 0.2] <- 0
+netTerms <- network(x = corTerms, directed = FALSE)
+plot(netTerms, vertex.cex = 1)
+set.edge.value(netTerms, attrname = 'edgeSize', value = corTerms * 3)
+ggnet2(
+  net = netTerms,
+  size.min = 3,
+  label = TRUE,
+  label.size = 3,
+  node.size = sna::degree(dat = netTerms),
+  edge.size = 'edgeSize',
+  family = 'AppleGothic')+
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold')
+        
+  )
+
+# 데이터프레임 만들기
+newsSparse = as.data.frame(as.matrix(spdtm))
+colnames(newsSparse) = make.names(colnames(newsSparse))
+
+newsSparse$label = as.factor(news_train_2$info)
+
+# train, test set 분리
+install.packages('caTools')
+library(caTools)
+set.seed(123)
+spl = sample.split(newsSparse$label, 0.7)
+train = subset(newsSparse, spl == TRUE)
+test = subset(newsSparse, spl == FALSE)
+
+# 정확도 함수
+perf_eval <- function(cm){
+  TPR = Recall = cm[2,2]/sum(cm[2,])
+  Precision = cm[2,2]/sum(cm[,2])
+  TNR = cm[1,1]/sum(cm[1,])
+  ACC = sum(diag(cm)) / sum(cm)
+  BCR = sqrt(TPR*TNR)
+  F1 = 2 * Recall * Precision / (Recall + Precision)
+  re <- data.frame(TPR=TPR,
+                   Precision = Precision,
+                   TNR = TNR,
+                   ACC = ACC,
+                   BCR = BCR,
+                   F1 = F1)
+  return(re)
+}
+# 로지스틱 회귀
+Logmodel = glm(label ~ ., data=train, family="binomial")
+Logmodel
+predictLog = predict(Logmodel, newdata=test, type="response") 
+table(test$label, predictLog > 0.5)
+pred_class<-as.factor(ifelse(predictLog>0.5,1,0))
+
+pred_class <- rep(0, nrow(test))
+pred_class[predictLog > 0.5] <- 1
+cm <- table(pred=pred_class, actual=test$label)
+perf_eval(cm)
+
+cm <- table(predictLog, test$label)
+perf_eval(cm)
+confusionMatrix(table(rf_pred,test$label))
+
+# Naive Bayes
+library(caret)
+naivesubject <- naiveBayes(label~., data=train)
+predictnaivesubject <- predict(naivesubject, newdata = test, type="class")
+cm <- table(predictnaivesubject, test$label)
+perf_eval(cm)
+confusionMatrix(table(predictnaivesubject, test$label))
+
+# Random Forest
+rf_classifier <- randomForest(label~., data=train, ntree = 300)
+rf_classifier
+rf_pred = predict(rf_classifier, newdata = test)
+cm <- table(rf_pred, test$label)
+perf_eval(cm)
+confusionMatrix(table(rf_pred,test$label))
+
+# svm
+svm_classifier <- svm(label~., data=train)
+svm_classifier
+svm_pred = predict(svm_classifier,test)
+cm <- table(svm_pred, test$label)
+perf_eval(cm)
+confusionMatrix(svm_pred,test$label)
+
+# bagging
+# Averaging
+pred_avg <-(as.numeric(as.character(pred_class)) + as.numeric(as.character(rf_pred)) + as.numeric(as.character(svm_pred)))/3
+pred_avg <-as.factor(ifelse(pred_avg>0.5,1,0))
+cm <- table(pred_avg, test$label)
+perf_eval(cm)
+confusionMatrix(pred_avg,test$label)
+# Majority Voting
+pred_majority<-as.factor(ifelse(pred_class==1 & rf_pred==1,1,ifelse(pred_class==1 & svm_pred==1,1,ifelse(rf_pred==1 & svm_pred==1,1,0))))
+cm <- table(pred_majority, test$label)
+perf_eval(cm)
+confusionMatrix(pred_majority,test$label)
