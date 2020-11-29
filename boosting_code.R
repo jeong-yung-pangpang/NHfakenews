@@ -23,6 +23,10 @@ output_vector = df[,info] == "0"
 
 bst <- xgboost(data = sparse_matrix, label = output_vector, max_depth = 10, eta = 0.5, nthread = 2, nrounds = 10, objective = "binary:logistic")
 bst
+#xbg모델 한번 더 xgboosting
+bst <- xgboost(data = sparse_matrix, label = output_vector, max_depth = 64, eta = 0.05, nthread = 2, nrounds = 10, objective = "binary:logistic",model = bst)
+
+
 importance <- xgb.importance(feature_names = colnames(sparse_matrix), model = bst)
 head(importance)
 
