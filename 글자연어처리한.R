@@ -5,8 +5,8 @@ library(multilinguer)
 install_jdk()
 # 위 함수에서 에러가 발생하면 알려주세요
 # https://github.com/mrchypark/multilinguer/issues
-
 # 의존성 패키지 설치
+
 install.packages(c("hash", "tau", "Sejong", "RSQLite", "devtools", "bit", "rex", "lazyeval", "htmlwidgets", "crosstalk", "promises", "later", "sessioninfo", "xopen", "bit64", "blob", "DBI", "memoise", "plogr", "covr", "DT", "rcmdcheck", "rversions"), type = "binary")
 
 # github 버전 설치
@@ -17,7 +17,6 @@ remotes::install_github('haven-jeon/KoNLP', upgrade = "never", INSTALL_opts=c("-
 install.packages("rJava")
 source("https://install-gith
 library(rJava)
-
 library(KoNLP)
 
 ub.me/talgalili/installr")
@@ -70,8 +69,6 @@ devtools::install_github("bmschmidt/wordVectors")
 install.packages("wordVectors")
 library(wordVectors)
 
-
-
 df_uniq <- unique(news_train$n_id)
 length(df_uniq)
 
@@ -88,14 +85,15 @@ text = gsub("&[[:alnum:]]+;", "", text)            # escape(&amp; &lt;등) 제�
 text = gsub("\\s{2,}", " ", text)                  # 2개이상 공백을 한개의 공백으로 처리
 text = gsub("[[:punct:]]", "", text)               # 특수 문자 제거 (앞의 처리 때문에 마지막에 해야 
 
-#형태소 분석
 mp <- SimplePos09(text)
 mp
 
+#형태소 분석()
 m_df <- mp%>%melt%>%as_tibble
 m_df_copy <- m_df[,c(3,1)]
 m_df_copy
 
+#Simplepos09로 변호
 m_df_copy_1 <- m_df_copy %>% 
   mutate(noun=str_match(value, '([가-힣]+)/N')[,2]) %>%
   na.omit %>% 
@@ -104,20 +102,22 @@ m_df_copy_1 <- m_df_copy %>%
 
 
 # 명사 추출 
-nouns <- sapply(text,extractNoun,USE.NAMES = F)
-Encoding(nouns3) = 'UTF-8'
+nouns <- sapply(text,extractNoun,USE.NAMES = F) #인코딩문제 있어서 sapply이용해서 저장해봤는데 의미없음
+Encoding(nouns3) = 'UTF-8' #tokenizer에서 한글꺠져서 시도했는데 변화없음
 nouns <- extractNoun(text)
 nouns <- nouns[nchar(nouns)>=2]  # 단어 길이 2이상 추출 
-nouns2 <- as.data.frame(as.matrix(nouns))
-nouns3 <- as.character(nouns)
+nouns2 <- as.data.frame(as.matrix(nouns)) # 이걸로는 
+nouns3 <- as.character(nouns) # tokenizer에 적용하려면 char로 바꿔야함
 head(nouns)
 
 
 #wordVector를 이용한 word2vec 활용!
 set.seed(1234)
 model <- word2vec(x = nouns3, type = "cbow", dim = 100, iter= 15, encoding = 'utf-8')
+#행렬로 바꾸는 것까지 ok
 embedding <- as.matrix(model)
 embedding[1:5, 1:5]
+#predict쓰니까 한글 깨지고 na값 받아옴..
 embedding1 <- predict(model, c("수협", "항공우주"), type = "embedding")
 lookslike <- predict(model, c("수협", "항공우주"), type = "nearest", top_n = 5)
 
@@ -130,27 +130,22 @@ news_test1 <- text[32313:46161,]
 #사전 훈련된 word2vec사용
 word2vec_model <- read.word2vec(file = "ko.w2v", nomalize = TRUE)
 
-#조정 가능한 변수
-max_words <- 15000 
-maxlen <- 32
+#조정 가능한 변수, 
+max_words <- 15000 #구성할 word_index개수
+maxlen <- 32 # 단어의 최대길이
 
-
+#tokenizer를 이용해서 단어를 정수인코딩 
 tokenizer <- text_tokenizer(num_words = max_words) %>%
   fit_text_tokenizer(text)
-
-
 sequences <- texts_to_sequences(tokenizer, nouns3)
 word_index1 <- as.matrix(word_index)
 word_index <- tokenizer$word_index
 
 
-iconv(word_index$name, to = 'UTF-8')
-
-
-#데이터 패딩
+#데이터 패딩, 단어의 길이를 맞춤
 data = pad_sequences(sequences, maxlen = maxlen)
 
-#데이터 스플릿
+#데이터 스플릿층
 train_matrix = data[1:nrow(news_train1),]
 test_matrix = data[(nrow(news_train1)+1):nrow(data),]
 
@@ -172,9 +167,8 @@ y_val = labels[validation_indices]
 dim(x_train)
 table(y_train)
 
-
+#단어 임베딩
 embeddings_index = new.env(hash = TRUE, parent = emptyenv())
-
 news_embedding_dim = 300
 news_embedding_matrix = array(0, c(max_words, news_embedding_dim))
 
@@ -187,12 +181,15 @@ for (word in names(word_index)){
       news_embedding_matrix[index+1,] <- news_embedding_vector
   }
 }
+
+
 #input
 input <- layer_input(
   shape = list(NULL),
   dtype = "int32",
   name = "input"
 )
+
 
 #hidden layer
 
