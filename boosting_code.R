@@ -12,7 +12,7 @@ news <- subset(news, select=-date)
 news <- subset(news, select=-n_id)
 news <- subset(news, select=-ord)
 
-df <- data.table(corpus, keep.rownames = FALSE)
+df <- data.table(news, keep.rownames = FALSE)
 
 levels(df[,info])
 
