@@ -1,26 +1,13 @@
-# java, rJava 설치 install.packages("multilinguer")
-# 이때 mac 사용자는 데스크탑 비밀번호를 물어봅니다. 입력해줘야 설치가 진행됩니다.
+
 install.packages('multilinguer')
 library(multilinguer)
-install_jdk()
-# 위 함수에서 에러가 발생하면 알려주세요
-# https://github.com/mrchypark/multilinguer/issues
-# 의존성 패키지 설치
-
 install.packages(c("hash", "tau", "Sejong", "RSQLite", "devtools", "bit", "rex", "lazyeval", "htmlwidgets", "crosstalk", "promises", "later", "sessioninfo", "xopen", "bit64", "blob", "DBI", "memoise", "plogr", "covr", "DT", "rcmdcheck", "rversions"), type = "binary")
 
-# github 버전 설치
+# KoNLP 설치
 install.packages("remotes")
-# 64bit 에서만 동작합니다.
 remotes::install_github('haven-jeon/KoNLP', upgrade = "never", INSTALL_opts=c("--no-multiarch"), force = TRUE)
-
-install.packages("rJava")
-source("https://install-gith
-library(rJava)
 library(KoNLP)
-
-ub.me/talgalili/installr")
-installr::install.java()
+#필요한 패키지 
 install.packages('wordcloud')
 install.packages('tm')
 install.packages('e1071')
@@ -40,7 +27,6 @@ install.packages("word2vec")
 install.packages("udpipe")
 require(tensorflow)
 install_tensorflow()
-
 library(wordcloud)
 library(tm)
 library(e1071)
@@ -52,10 +38,10 @@ library(tidyr)
 library(reshape2)
 library(wordcloud2)
 library(keras)
-library(tidyverse) # importing, cleaning, visualising 
-library(tidytext) # working with text
-library(keras) # deep learning with keras
-library(data.table) # fast csv reading
+library(tidyverse)
+library(tidytext)
+library(keras) 
+library(data.table) 
 library(tensorflow)
 library(ggplot2)
 library(wordVectors)
@@ -69,6 +55,9 @@ devtools::install_github("bmschmidt/wordVectors")
 install.packages("wordVectors")
 library(wordVectors)
 
+=========================================================================================================================
+
+#데이터 전처리 
 df_uniq <- unique(news_train$n_id)
 length(df_uniq)
 
@@ -79,37 +68,22 @@ sum(is.na(news_train))
 news_train_2 = news_train[-which(duplicated(news_train$content)),]
 text = news_train_2$content
 
-#한글 외 문자 제거
-text <- str_replace_all(text, "[^ㄱ-ㅎㅏ-ㅣ가-힣 ]","")
-text = gsub("&[[:alnum:]]+;", "", text)            # escape(&amp; &lt;등) 제거
-text = gsub("\\s{2,}", " ", text)                  # 2개이상 공백을 한개의 공백으로 처리
-text = gsub("[[:punct:]]", "", text)               # 특수 문자 제거 (앞의 처리 때문에 마지막에 해야 
-
-mp <- SimplePos09(text)
-mp
-
-#형태소 분석()
-m_df <- mp%>%melt%>%as_tibble
-m_df_copy <- m_df[,c(3,1)]
-m_df_copy
-
-#Simplepos09로 변호
-m_df_copy_1 <- m_df_copy %>% 
-  mutate(noun=str_match(value, '([가-힣]+)/N')[,2]) %>%
-  na.omit %>% 
-  filter(str_length(noun)>=2) %>% 
-  count(noun, sort=TRUE) 
-
 
 # 명사 추출 
-nouns <- sapply(text,extractNoun,USE.NAMES = F) #인코딩문제 있어서 sapply이용해서 저장해봤는데 의미없음
-Encoding(nouns3) = 'UTF-8' #tokenizer에서 한글꺠져서 시도했는데 변화없음
 nouns <- extractNoun(text)
 nouns <- nouns[nchar(nouns)>=2]  # 단어 길이 2이상 추출 
-nouns2 <- as.data.frame(as.matrix(nouns)) # 이걸로는 
-nouns3 <- as.character(nouns) # tokenizer에 적용하려면 char로 바꿔야함
+nouns2 <- as.data.frame(as.matrix(nouns))
+nouns3 <- as.character(nouns) 
 head(nouns)
 
+#wordcloud
+df1 <- nouns %>% 
+  mutate(noun=str_match(value, '([가-힣]+)/N')[,3]) %>%
+  na.omit %>% 
+  filter(str_length(noun)>=2) %>% 
+  count(noun, sort=TRUE) %>%
+  filter(n>=200) %>%
+  wordcloud2(fontFamily='Noto Sans CJK KR Bold', size = 0.5)
 
 #wordVector를 이용한 word2vec 활용!
 set.seed(1234)
@@ -121,7 +95,7 @@ embedding[1:5, 1:5]
 embedding1 <- predict(model, c("수협", "항공우주"), type = "embedding")
 lookslike <- predict(model, c("수협", "항공우주"), type = "nearest", top_n = 5)
 
-nrow(nouns2)
+
 
 #데이터 스플릿
 news_train1 <- text[1:32312,]
