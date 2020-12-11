@@ -48,6 +48,7 @@ library(wordVectors)
 library(readr)
 library(word2vec)
 library(udpipe)
+library(caret)
 
 #wordvectors패키지 설치
 require(devtools)
@@ -139,27 +140,12 @@ corTerms[1:10, 1:10]
 dim(corTerms)
 netTerms <- network(x = corTerms, directed = FALSE)
 plot(netTerms, vertex.cex = 1)
-corTerms[corTerms <= 0.2] <- 0
-netTerms <- network(x = corTerms, directed = FALSE)
-plot(netTerms, vertex.cex = 1)
-set.edge.value(netTerms, attrname = 'edgeSize', value = corTerms * 3)
-ggnet2(
-  net = netTerms,
-  size.min = 3,
-  label = TRUE,
-  label.size = 3,
-  node.size = sna::degree(dat = netTerms),
-  edge.size = 'edgeSize',
-  family = 'AppleGothic')+
-  theme(plot.title = element_text(hjust = 0.5, face = 'bold')
-        
-  )
 
 # 데이터프레임 만들기
 newsSparse = as.data.frame(as.matrix(spdtm))
 colnames(newsSparse) = make.names(colnames(newsSparse))
 
-newsSparse$label = as.factor(news$label)
+newsSparse$label = as.factor(news_train_2$label)
 
 # train, test set 분리
 library(caTools)
@@ -184,6 +170,7 @@ perf_eval <- function(cm){
                    F1 = F1)
   return(re)
 }
+                                                           
 # 로지스틱 회귀
 Logmodel = glm(label ~ ., data=train, family="binomial")
 predictLog = predict(Logmodel, newdata=test, type="response") 
@@ -192,12 +179,7 @@ pred_class<-as.factor(ifelse(predictLog>0.5,1,0))
 
 pred_class <- rep(0, nrow(test))
 pred_class[predictLog > 0.5] <- 1
-cm <- table(pred=pred_class, actual=test$label)
-perf_eval(cm)
-
-cm <- table(predictLog, test$label)
-perf_eval(cm)
-confusionMatrix(table(rf_pred,test$label))
+confusionMatrix(table(pred_class, text$label))
 
 # Naive Bayes
 library(caret)
