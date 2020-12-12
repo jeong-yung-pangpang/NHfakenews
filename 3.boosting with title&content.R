@@ -26,8 +26,9 @@ bst
 #xbg모델 한번 더 xgboosting
 bst <- xgboost(data = sparse_matrix, label = output_vector, max_depth = 64, eta = 0.05, nthread = 2, nrounds = 10, objective = "binary:logistic",model = bst)
 
-
+#부스팅 모델 학습에 영향이 큰(importance한) 변수들을 추출한다.
 importance <- xgb.importance(feature_names = colnames(sparse_matrix), model = bst)
 head(importance)
 
+#변수들의 영향률과 순위를 알기 위하여 plot
 xgb.plot.importance(importance_matrix = importance)
