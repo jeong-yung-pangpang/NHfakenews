@@ -10,11 +10,12 @@ news <- subset(news, select=-date)
 news <- subset(news, select=-n_id)
 news <- subset(news, select=-ord)
 
+#content의 문장을 토큰화한다.
 vocab <- create_vocabulary(itoken(news$content,
                                   preprocessor = tolower,
                                   tokenizer = word_tokenizer))
 
-# Build a document-term matrix using the tokenized review text. This returns a dgCMatrix object
+# 토큰화된 텍스트를 dtm matrix화한다. 이 코드는 xgboosting에 최적화된 dgCMatrix형태를 반환한다.
 dtm_train <- create_dtm(itoken(news$content,
                                preprocessor = tolower,
                                tokenizer = word_tokenizer),
@@ -22,6 +23,7 @@ dtm_train <- create_dtm(itoken(news$content,
 
 train_matrix <- xgb.DMatrix(dtm_train, label = news$info)
 
+# xgboost 모델링, 여기서 eta는 , max_depth는 , nrounds는 , objective는 이다.
 xgb_fit <- xgboost(data = train_matrix, eta = 0.01, max_depth = 5, nrounds = 10, objective = "binary:logistic")
 
 set.seed(100)
