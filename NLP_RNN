@@ -90,7 +90,8 @@ text <- str_replace_all(text, "[^ㄱ-ㅎㅏ-ㅣ가-힣 ]","")
 text = gsub("&[[:alnum:]]+;", "", text)            # escape(&amp; &lt;등) 제거
 text = gsub("\\s{2,}", " ", text)                  # 2개이상 공백을 한개의 공백으로 처리
 text = gsub("[[:punct:]]", "", text)               # 특수문자 제거
-
+news_test_label = news_train_2$info
+news_test_label = news_test_label[32313:46161]
 
 #조정 가능한 변수, 
 max_words <- 15000 #구성할 word_index개수
@@ -110,6 +111,7 @@ data = pad_sequences(sequences, maxlen = maxlen)
 text <- as.data.frame(text)
 news_train1 <- as.matrix(text[1:32312,])
 news_test1 <- as.matrix(text[32313:46161,])
+
 
 #데이터 스플릿층
 train_matrix = data[1:nrow(news_train1),]
@@ -199,7 +201,7 @@ history <- model %>% fit(
   y_train,
   batch_size = 2048,
   validation_data = list(x_val, y_val),
-  epochs = 35,
+  epochs = 15,
   view_metrics = FALSE,
   verbose = 0
 )
@@ -236,7 +238,7 @@ perf_eval <- function(cm){
   return(re)
 }
 
-cm <- table(pred=predictions, actual=news_test1$label)
+cm <- table(pred=predictions, actual=news_test_label)
 perf_eval(cm)
 
 
