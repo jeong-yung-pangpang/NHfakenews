@@ -140,7 +140,6 @@ embeddings_index = new.env(hash = TRUE, parent = emptyenv())
 news_embedding_dim = 300
 news_embedding_matrix = array(0, c(max_words, news_embedding_dim))
 
-#가져는 왔는데 사용 상황자체가 다르기 때문에 큰 의미가 없는듯
 for (word in names(word_index)){
   index <- word_index[[word]]
   if(index < max_words){
@@ -178,8 +177,6 @@ predictions <- dense %>%
 #모델 구축
 model <- keras_model(input, predictions)
 
-# Freeze the embedding weights initially to prevent updates propgating back through and ruining our embedding
-# 이거 쓰면 정확도 안나옴, 사용 데이터랑 호환이 안되는 듯..?
 # get_layer(model, name = "embedding") %>%
 #   set_weights(list(news_embedding1_matrix)) %>%
 #   freeze_weights()
