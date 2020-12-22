@@ -175,6 +175,7 @@ model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
 history = model.fit(train_inputs, train_labels, batch_size=BATCH_SIZE, epochs=NUM_EPOCHS,
                     validation_split=VALID_SPLIT)
 
+predictions = predict(model, test_inputs)
 predictions_label = np.where(predictions >= 0.5, 1, 0)
 predictions_label = pd.DataFrame(predictions_label)
 predictions_label.to_csv('./CNN_Predictions.csv',header=True)
