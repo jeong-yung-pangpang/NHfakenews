@@ -113,7 +113,7 @@ data_configs['vocab_size'] = len(word_vocab)+1
 #모델 적용(CNN)
 model_name = 'cnn_classifier'
 BATCH_SIZE = 512 
-NUM_EPOCHS=2
+NUM_EPOCHS=5
 VALID_SPLIT=0.1
 MAX_LEN=train_inputs.shape[1] #max_length = 10
 
