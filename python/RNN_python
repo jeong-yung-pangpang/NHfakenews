@@ -1,0 +1,193 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec 24 10:57:17 2020
+
+@author: anhis
+"""
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+import seaborn as sn
+import re
+import json
+from konlpy.tag import Okt
+import tensorflow as tf
+from tensorflow.python.keras.preprocessing.sequence import pad_sequences
+from tensorflow.python.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras import layers
+from tqdm import tqdm
+from transformers import *
+
+
+
+Train = pd.read_csv("C:/workspace/news_train.csv")
+Test = pd.read_csv("C:/workspace/news_test.csv")
+
+print('전체 학습 데이터의 개수 {}'.format(len(Train)))
+train_lenght = Train['content'].astype(str).apply(len)
+train_lenght.head()
+
+#레이블 값 비율
+print('길이 최댓값: {}'.format(np.max(train_lenght)))
+
+fig, axe = plt.subplots(ncols=1)
+fig.set_size_inches(6,3)
+sn.countplot(Train['info'])
+
+#단어 길이 비율
+train_word_counts = Train['content'].astype(str).apply(lambda x:len(x.split(' ')))
+print('뉴스 단어 개수 평균값 : {:.2f}'.format(np.mean(train_word_counts)))
+
+plt.figure(figsize=(15,10))
+plt.hist(train_word_counts, bins=50, label='train')
+plt.title('Log-Histogram of word count in NEWS', fontsize=15)
+plt.yscale('log', nonposy='clip')
+plt.legend()
+plt.xlabel('Number of words', fontsize=15)
+plt.ylabel('Number of reviews', fontsize=15)
+
+Train['content'][:5]
+
+
+def preprocessing(news, okt, remove_stopwords = False, stop_words = []):
+    #news : 전처리할 텍스트
+    #okt객체 : 형태소분석기(어간추출)
+    #stop_words : 불용어
+    #정규표현식을 이용해서 한글을 제외한 나머지 문자들 제거
+    news_text = re.sub("[^ㄱ-ㅎㅏ-ㅣ가-힣 ]", "", news)
+    
+    #okt객체를 이용해 형태소 단위로 분리
+    word_news = okt.morphs(news_text, stem=True)
+    
+    #불용어 제거 선택
+    if remove_stopwords:
+        word_news = [token for token in word_news if not token in stop_words]
+        
+    return word_news
+
+
+stop_words = ['은', '는', '이', '가', '하', '아', '것', '들', '의', '있', '되', '수', '보', '주', '등', '한']
+okt = Okt()
+
+
+#Traing 데이터 전처리
+clean_train_news = []
+for news in Train['content']:
+    
+        if type(news) ==str:
+            clean_train_news.append(preprocessing(news, okt, remove_stopwords = True,  
+                                                    stop_words = stop_words))
+        else:
+            clean_train_news.append([])
+      
+         
+      
+#Test 데이터 전처리
+
+clean_test_news = []
+for news in Test['content']:
+    
+        if type(news) ==str:
+            clean_test_news.append(preprocessing(news, okt, remove_stopwords = True, 
+                                                    stop_words = stop_words))
+        else:
+            clean_test_news.append([])
+            
+
+#tokenizer로 데이터 분리 및 임베딩 벡터화
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(clean_train_news)
+train_sequences = tokenizer.texts_to_sequences(clean_train_news) #단어 정수화(Train)
+test_sequences=tokenizer.texts_to_sequences(clean_test_news) #단어 정수화(Test)
+
+word_vocab = tokenizer.word_index #단어 사전 형성
+
+MAX_SEQUENCE_LENGTH = 10 #패딩을 위한 최대 Feature개수 설정
+
+train_inputs = pad_sequences(train_sequences, maxlen=MAX_SEQUENCE_LENGTH, padding='post') #정해진 문자길이로 통일(Padding)
+
+train_labels = np.array(Train['info']) #학습을 위한 레이블 변수 생성
+
+test_inputs = pad_sequences(test_sequences, maxlen=MAX_SEQUENCE_LENGTH, padding='post') 
+
+#단어사전 저장 및 길이추가
+data_configs = {}
+data_configs['vocab'] = word_vocab
+data_configs['vocab_size'] = len(word_vocab)+1
+
+#모델 적용(RNN)
+model_name = 'rnn_classifier'
+BATCH_SIZE = 512 
+NUM_EPOCHS=5
+VALID_SPLIT=0.1
+MAX_LEN=train_inputs.shape[1] #max_length = 10
+
+
+
+kargs = {'model_name': model_name,
+         'vocab_size': data_configs['vocab_size'],
+         'embedding_dimension' : 100,
+         'dropout_rate':0.2,
+         'lstm_dimension' : 150,
+         'dense_dimension' : 150,
+         'output_dimension': 1}
+
+#RNN 모델 구현
+class RNNClassifier(tf.keras.Model):
+    
+    def __init__(self, **kargs):
+        super(RNNClassifier, self).__init__(name=kargs['model_name'])
+        #임베딩 벡터 생성
+        self.embedding = layers.Embedding(input_dim=kargs['vocab_size'],
+                                          output_dim=kargs['embedding_dimension'])
+        
+        #LSTM Layer
+        self.lstm_1_layer = tf.keras.layers.LSTM(kargs['lstm_dimension'],
+                                                return_sequences=True)
+        self.lstm_2_layer = tf.keras.layers.LSTM(kargs['lstm_dimension'])
+       
+        
+        #과적합 방지를 위한 Dropout
+        self.dropout = layers.Dropout(kargs['dropout_rate'])
+        
+        #fully-connected 계층 
+        self.fc1 = layers.Dense(units=kargs['dense_dimension'],
+                                activation=tf.keras.activations.tanh)
+        self.fc2 = layers.Dense(units=kargs['output_dimension'],
+                                activation=tf.keras.activations.sigmoid)
+        
+    def call(self, x):
+        x = self.embedding(x)
+        x = self.dropout(x)
+        x = self.lstm_1_layer(x)
+        x = self.lstm_2_layer(x)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        
+        return x
+    
+model = RNNClassifier(**kargs)
+model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
+             loss=tf.keras.losses.BinaryCrossentropy(),
+             metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy')])
+
+
+history = model.fit(train_inputs, train_labels, batch_size=BATCH_SIZE, epochs=NUM_EPOCHS,
+                    validation_split=VALID_SPLIT)
+
+predictions = model.predict(test_inputs)
+predictions_label = np.where(predictions >= 0.5, 1, 0)
+predictions_label = pd.DataFrame(predictions_label)
+predictions_label.to_csv('./RNN_Predictions.csv',header=True)
+
+
+
+
+
+
+            
+    
