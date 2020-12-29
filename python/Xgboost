@@ -1,0 +1,52 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Dec 30 00:49:53 2020
+
+@author: anhis
+"""
+#------------------------------------------------------------------XGBOOST-------------------------------------------------
+
+from xgboost import plot_importance
+from xgboost import XGBClassifier
+from sklearn.model_selection import GridSearchCV, train_test_split
+
+Train = pd.read_csv("C:/workspace/news_train.csv")
+Test = pd.read_csv("C:/workspace/news_test.csv")
+
+#tokenizer로 데이터 분리 및 임베딩 벡터화
+seed = 42
+tf.random.set_seed(seed)
+
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(clean_train_news)
+train_sequences = tokenizer.texts_to_sequences(clean_train_news) #단어 정수화(Train)
+test_sequences=tokenizer.texts_to_sequences(clean_test_news) #단어 정수화(Test)
+
+word_vocab = tokenizer.word_index #단어 사전 형성
+
+MAX_SEQUENCE_LENGTH = 10 #패딩을 위한 최대 Feature개수 설정
+
+train_inputs = pad_sequences(train_sequences, maxlen=MAX_SEQUENCE_LENGTH, padding='post') #정해진 문자길이로 통일(Padding)
+
+train_labels = np.array(Train['info']) #학습을 위한 레이블 변수 생성
+
+test_inputs = pad_sequences(test_sequences, maxlen=MAX_SEQUENCE_LENGTH, padding='post') 
+
+
+news_train1 = pd.DataFrame(news_train1)
+
+xgb_param_grid = {'n_estimators' : [100,200,400,600],
+                  'learning_rate' : [0.01, 0.05, 0.1, 0.15, 0.2],
+                  'max_depth' : [4, 6, 8, 10, 12]}
+
+xgb = XGBClassifier()
+xgb_param_grid
+xgb_grid = GridSearchCV(xgb, param_grid = xgb_param_grid, scoring='accuracy', n_jobs = -1, verbose=1)
+xgb_grid.fit(train_inputs, train_labels)
+
+print("최고 평균 정확도 : {0:.4f}".format(xgb_grid.best_score_))
+print("최고의 파라미터 : ", xgb_grid.best_params_)
+predictions_xgboost = xgb_grid.predict(test_inputs)
+
+predictions_xgboost = pd.DataFrame(predictions_xgboost)
+predictions_xgboost.to_csv('./Xgboost_Predictions(91%).csv',header=True)
