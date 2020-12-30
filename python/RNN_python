@@ -4,6 +4,7 @@ Created on Thu Dec 24 10:57:17 2020
 
 @author: anhis
 """
+
 import numpy as np
 import pandas as pd
 import os
@@ -19,11 +20,13 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras import layers
 from tqdm import tqdm
 from transformers import *
+import matplotlib as plt 
 
 
 
 Train = pd.read_csv("C:/workspace/news_train.csv")
 Test = pd.read_csv("C:/workspace/news_test.csv")
+
 
 print('전체 학습 데이터의 개수 {}'.format(len(Train)))
 train_lenght = Train['content'].astype(str).apply(len)
@@ -97,6 +100,9 @@ for news in Test['content']:
             
 
 #tokenizer로 데이터 분리 및 임베딩 벡터화
+seed = 42
+tf.random.set_seed(seed)
+
 tokenizer = Tokenizer()
 tokenizer.fit_on_texts(clean_train_news)
 train_sequences = tokenizer.texts_to_sequences(clean_train_news) #단어 정수화(Train)
@@ -104,7 +110,7 @@ test_sequences=tokenizer.texts_to_sequences(clean_test_news) #단어 정수화(T
 
 word_vocab = tokenizer.word_index #단어 사전 형성
 
-MAX_SEQUENCE_LENGTH = 10 #패딩을 위한 최대 Feature개수 설정
+MAX_SEQUENCE_LENGTH = 52 #패딩을 위한 최대 Feature개수 설정
 
 train_inputs = pad_sequences(train_sequences, maxlen=MAX_SEQUENCE_LENGTH, padding='post') #정해진 문자길이로 통일(Padding)
 
@@ -120,7 +126,7 @@ data_configs['vocab_size'] = len(word_vocab)+1
 #모델 적용(RNN)
 model_name = 'rnn_classifier'
 BATCH_SIZE = 512 
-NUM_EPOCHS=5
+NUM_EPOCHS=10
 VALID_SPLIT=0.1
 MAX_LEN=train_inputs.shape[1] #max_length = 10
 
@@ -129,7 +135,7 @@ MAX_LEN=train_inputs.shape[1] #max_length = 10
 kargs = {'model_name': model_name,
          'vocab_size': data_configs['vocab_size'],
          'embedding_dimension' : 100,
-         'dropout_rate':0.2,
+         'dropout_rate':0.3,
          'lstm_dimension' : 150,
          'dense_dimension' : 150,
          'output_dimension': 1}
@@ -154,8 +160,10 @@ class RNNClassifier(tf.keras.Model):
         
         #fully-connected 계층 
         self.fc1 = layers.Dense(units=kargs['dense_dimension'],
-                                activation=tf.keras.activations.tanh)
-        self.fc2 = layers.Dense(units=kargs['output_dimension'],
+                                activation=tf.keras.activations.elu)
+        self.fc2 = layers.Dense(units=kargs['dense_dimension'],
+                                activation=tf.keras.activations.relu)
+        self.fc3 = layers.Dense(units=kargs['output_dimension'],
                                 activation=tf.keras.activations.sigmoid)
         
     def call(self, x):
@@ -167,6 +175,8 @@ class RNNClassifier(tf.keras.Model):
         x = self.fc1(x)
         x = self.dropout(x)
         x = self.fc2(x)
+        x = self.dropout(x)
+        x = self.fc3(x)
         
         return x
     
@@ -179,10 +189,13 @@ model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
 history = model.fit(train_inputs, train_labels, batch_size=BATCH_SIZE, epochs=NUM_EPOCHS,
                     validation_split=VALID_SPLIT)
 
+print(history)
+
+
 predictions = model.predict(test_inputs)
 predictions_label = np.where(predictions >= 0.5, 1, 0)
 predictions_label = pd.DataFrame(predictions_label)
-predictions_label.to_csv('./RNN_Predictions.csv',header=True)
+predictions_label.to_csv('./RNN_Predictions4.csv',header=True)
 
 
 
