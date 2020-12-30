@@ -1,0 +1,185 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec 31 04:24:34 2020
+
+@author: anhis
+"""
+from google.colab import drive
+drive.mount('/content/drive')
+
+!pip install konlpy
+!pip install transformers
+!pip install mxnet
+!pip install gluonnlp pandas tqdm
+!pip install sentencepiece
+!pip install transformers==3
+!pip install torch
+
+
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+import seaborn as sn
+import re
+import json
+from konlpy.tag import Okt
+import tensorflow as tf
+from tensorflow.python.keras.preprocessing.sequence import pad_sequences
+from tensorflow.python.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras import layers
+from tqdm import tqdm
+from transformers import *
+import keras as keras
+from keras.models import load_model
+from keras import backend as K
+from keras import Input, Model
+from keras import optimizers
+import torch
+from torch import nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+import gluonnlp as nlp
+import numpy as np
+from tqdm import tqdm, tqdm_notebook
+from transformers import AdamW
+from transformers.optimization import get_cosine_schedule_with_warmup
+import tensorflow_addons as tfa
+
+
+
+tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
+
+def convert_data(data_df):
+    global tokenizer
+    
+    SEQ_LEN = 128 #SEQ_LEN : 버트에 들어갈 인풋의 길이
+    
+    tokens, masks, segments, targets = [], [], [], []
+    
+    for i in tqdm(range(len(data_df))):
+        # token : 문장을 토큰화함
+        token = tokenizer.encode(data_df[DATA_COLUMN][i], max_length=SEQ_LEN, truncation=True, padding='max_length')
+       
+        # 마스크는 토큰화한 문장에서 패딩이 아닌 부분은 1, 패딩인 부분은 0으로 통일
+        num_zeros = token.count(0)
+        mask = [1]*(SEQ_LEN-num_zeros) + [0]*num_zeros
+        
+        # 문장의 전후관계를 구분해주는 세그먼트는 문장이 1개밖에 없으므로 모두 0
+        segment = [0]*SEQ_LEN
+
+        # 버트 인풋으로 들어가는 token, mask, segment를 tokens, segments에 각각 저장
+        tokens.append(token)
+        masks.append(mask)
+        segments.append(segment)
+        
+        # 정답(가짜 : 1 진짜 0)을 targets 변수에 저장해 줌
+        targets.append(data_df[LABEL_COLUMN][i])
+
+    # tokens, masks, segments, 정답 변수 targets를 numpy array로 지정    
+    tokens = np.array(tokens)
+    masks = np.array(masks)
+    segments = np.array(segments)
+    targets = np.array(targets)
+
+    return [tokens, masks, segments], targets
+
+# 위에 정의한 convert_data 함수를 불러오는 함수를 정의
+def load_data(pandas_dataframe):
+    data_df = pandas_dataframe
+    data_df[DATA_COLUMN] = data_df[DATA_COLUMN].astype(str)
+    data_df[LABEL_COLUMN] = data_df[LABEL_COLUMN].astype(int)
+    data_x, data_y = convert_data(data_df)
+    return data_x, data_y
+
+SEQ_LEN = 128
+BATCH_SIZE = 20
+# fake,real 문장을 포함하고 있는 칼럼
+DATA_COLUMN = "content"
+
+#레이블 값
+LABEL_COLUMN = "info"
+
+# train 데이터를 버트 인풋에 맞게 변환
+train_x, train_y = load_data(Train)
+
+# TPU 객체 지정
+TPU = True
+if TPU:
+  resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu='grpc://' + os.environ['COLAB_TPU_ADDR'])
+  tf.config.experimental_connect_to_cluster(resolver)
+  tf.tpu.experimental.initialize_tpu_system(resolver)
+else:
+  pass
+
+model = TFBertModel.from_pretrained('bert-base-multilingual-cased')
+# 토큰 인풋, 마스크 인풋, 세그먼트 인풋 정의
+token_inputs = tf.keras.layers.Input((SEQ_LEN,), dtype=tf.int32, name='input_word_ids')
+mask_inputs = tf.keras.layers.Input((SEQ_LEN,), dtype=tf.int32, name='input_masks')
+segment_inputs = tf.keras.layers.Input((SEQ_LEN,), dtype=tf.int32, name='input_segment')
+# 인풋이 [토큰, 마스크, 세그먼트]인 모델 정의
+bert_outputs = model([token_inputs, mask_inputs, segment_inputs])
+# 버트 아웃풋의 텐서의 shape은 [batch_size, 문장의 길이, 768]임
+
+bert_outputs = bert_outputs[1]
+fakenews_first = tf.keras.layers.Dense(1, activation='sigmoid', kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02))(bert_outputs)
+fakenews_model = tf.keras.Model([token_inputs, mask_inputs, segment_inputs], fakenews_first)
+fakenews_model.compile(optimizer=tf.keras.optimizers.Adam(lr=1.0e-5), loss=tf.keras.losses.BinaryCrossentropy(), metrics = ['accuracy'])
+
+fakenews_model.summary()
+
+opt = tfa.optimizers.RectifiedAdam(lr=1.0e-5, weight_decay=0.0025)
+
+# TPU 실행 시
+if TPU:
+  strategy = tf.distribute.experimental.TPUStrategy(resolver)
+# 함수를 strategy.scope로 묶어 줌
+  with strategy.scope():
+    fakenews_model = create_fakenews_bert()
+  
+    fakenews_model.fit(train_x, train_y, epochs=5, shuffle=True, batch_size=32,  validation_split = 0.1)
+else:
+  fakenews_model = create_fakenews_bert()
+  
+  fakenews_model.fit(train_x, train_y, epochs=5, shuffle=True, batch_size=32,  validation_split = 0.1)
+  
+  
+def predict_convert_data(data_df):
+    global tokenizer
+    tokens, masks, segments = [], [], []
+    
+    for i in tqdm(range(len(data_df))):
+
+        token = tokenizer.encode(data_df[DATA_COLUMN][i], max_length=SEQ_LEN, truncation=True, padding='max_length')
+        num_zeros = token.count(0)
+        mask = [1]*(SEQ_LEN-num_zeros) + [0]*num_zeros
+        segment = [0]*SEQ_LEN
+
+        tokens.append(token)
+        segments.append(segment)
+        masks.append(mask)
+
+    tokens = np.array(tokens)
+    masks = np.array(masks)
+    segments = np.array(segments)
+    return [tokens, masks, segments]
+
+# 위에 정의한 convert_data 함수를 불러오는 함수를 정의
+def predict_load_data(pandas_dataframe):
+    data_df = pandas_dataframe
+    data_df[DATA_COLUMN] = data_df[DATA_COLUMN].astype(str)
+    data_x = predict_convert_data(data_df)
+    return data_x
+
+test_set = predict_load_data(Test)
+
+with strategy.scope():
+  preds = fakenews_model.predict(test_set)
+  
+predictions_label = np.where(preds >= 0.5, 1, 0)
+predictions_label = pd.DataFrame(predictions_label)
+predictions_label.to_csv('/content/drive/My Drive/news/Bert_Predictions1.csv',header=True)  
+  
+
